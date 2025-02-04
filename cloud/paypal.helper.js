@@ -2,6 +2,7 @@ const axios = require("axios");
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 const PAYPAL_API_BASE_URL = process.env.PAYPAL_API_BASE_URL
+const PAYPAL_API_ACCESS_TOKEN = process.env.PAYPAL_API_ACCESS_TOKEN
 
 
 async function getAccessToken() {
@@ -49,7 +50,7 @@ async function makePayout(receiverId, amount) {
     };
     const response = await axios.post(`${PAYPAL_API_BASE_URL}/v1/payments/payouts`, payoutData, {
       headers: {
-        Authorization: `Bearer A21AAJhSFnOhSJtG1ILz11oQ2mEyY776tnW8UBQpkxc1ADdB4A-PMtK_VufO_pzTnDiQrbjHCrtdUlZ4PoTFcSOeaC4FL2LmA`,
+        Authorization: `Bearer ${PAYPAL_API_ACCESS_TOKEN}`,
         "Content-Type": "application/json",
       },
     });
@@ -72,7 +73,7 @@ async function getPayoutDetails(payoutBatchId) {
           total_required: true,
         },
         headers: {
-          Authorization: `Bearer A21AAJhSFnOhSJtG1ILz11oQ2mEyY776tnW8UBQpkxc1ADdB4A-PMtK_VufO_pzTnDiQrbjHCrtdUlZ4PoTFcSOeaC4FL2LmA`,
+          Authorization: `Bearer ${PAYPAL_API_ACCESS_TOKEN}`,
           "Content-Type": "application/json",
         },
       }
