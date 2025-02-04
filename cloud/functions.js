@@ -3,7 +3,7 @@ const fs = require("fs");
 const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
-const { makePayout } = require("./helper");
+const { makePayout,getPayoutDetails } = require("./paypal.helper");
 
 Parse.Cloud.define("createUser", async (request) => {
   const {
@@ -686,7 +686,7 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       } else {
         throw new Error(`Wallet not found for user: ${username}`);
       }
-      await sendEmailNotification(username, transactionAmount);
+      // await sendEmailNotification(username, transactionAmount);
     }
 
     // Save the transaction
@@ -1850,6 +1850,25 @@ Parse.Cloud.define("sendPayout", async (request) => {
     const payoutResult = await makePayout(receiverId, amount);
     return { success: true, data: payoutResult };
   } catch (error) {
+    console.log(error, "error");
+    return {
+      status: "error",
+      message: error.message,
+    };
+  }
+});
+
+Parse.Cloud.define("fetchPayoutDetails", async (request) => {
+  const { payoutBatchId } = request.params;
+
+  if (!payoutBatchId) {
+    throw new Parse.Error(400, "Missing required field: payoutBatchId");
+  }
+
+  try {
+    const payoutDetails = await getPayoutDetails(payoutBatchId);
+    return { success: true, data: payoutDetails };
+  } catch (error) {
     return {
       status: "error",
       message: error.message,
@@ -1861,55 +1880,55 @@ Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");
 });
 
-async function sendEmailNotification(username, transactionAmount) {
-  try {
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL, // Replace with your Gmail address
-        pass: process.env.PASSWORD, // Replace with your Gmail app password
-      },
-    });
+// async function sendEmailNotification(username, transactionAmount) {
+//   try {
+//     // Create transporter
+//     const transporter = nodemailer.createTransport({
+//       service: "gmail",
+//       auth: {
+//         user: process.env.EMAIL, // Replace with your Gmail address
+//         pass: process.env.PASSWORD, // Replace with your Gmail app password
+//       },
+//     });
 
-    // Enhanced HTML content
-    const htmlContent = `
-     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-       <div style="background-color: #4CAF50; color: white; padding: 16px; text-align: center;">
-         <h2 style="margin: 0;">Cashout Request Notification</h2>
-       </div>
-       <div style="padding: 16px;">
-         <p style="font-size: 16px;">Dear Team,</p>
-         <p style="font-size: 16px;">A new <strong>cashout request</strong> has been initiated. Below are the details:</p>
-         <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
-           <tr>
-             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">User:</td>
-             <td style="padding: 8px; border: 1px solid #ddd;">${username}</td>
-           </tr>
-           <tr>
-             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount:</td>
-             <td style="padding: 8px; border: 1px solid #ddd;">$${transactionAmount}</td>
-           </tr>
-         </table>
-         <p style="margin-top: 16px; font-size: 16px;">Please review and take necessary action.</p>
-       </div>
-       <div style="background-color: #f1f1f1; padding: 16px; text-align: center;">
-         <p style="font-size: 14px; color: #555;">This is an automated notification. Please do not reply.</p>
-       </div>
-     </div>
-   `;
-    // Email options
-    const mailOptions = {
-      from: process.env.EMAIL, // Replace with your Gmail address
-      to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"], // Replace with recipient emails
-      subject: "Cashout Request Notification",
-      html: htmlContent, // Use HTML content
-    };
+//     // Enhanced HTML content
+//     const htmlContent = `
+//      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+//        <div style="background-color: #4CAF50; color: white; padding: 16px; text-align: center;">
+//          <h2 style="margin: 0;">Cashout Request Notification</h2>
+//        </div>
+//        <div style="padding: 16px;">
+//          <p style="font-size: 16px;">Dear Team,</p>
+//          <p style="font-size: 16px;">A new <strong>cashout request</strong> has been initiated. Below are the details:</p>
+//          <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+//            <tr>
+//              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">User:</td>
+//              <td style="padding: 8px; border: 1px solid #ddd;">${username}</td>
+//            </tr>
+//            <tr>
+//              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount:</td>
+//              <td style="padding: 8px; border: 1px solid #ddd;">$${transactionAmount}</td>
+//            </tr>
+//          </table>
+//          <p style="margin-top: 16px; font-size: 16px;">Please review and take necessary action.</p>
+//        </div>
+//        <div style="background-color: #f1f1f1; padding: 16px; text-align: center;">
+//          <p style="font-size: 14px; color: #555;">This is an automated notification. Please do not reply.</p>
+//        </div>
+//      </div>
+//    `;
+//     // Email options
+//     const mailOptions = {
+//       from: process.env.EMAIL, // Replace with your Gmail address
+//       to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"], // Replace with recipient emails
+//       subject: "Cashout Request Notification",
+//       html: htmlContent, // Use HTML content
+//     };
 
-    // Send email
-    await transporter.sendMail(mailOptions);
-    console.log("Emails sent successfully.");
-  } catch (error) {
-    console.error("Error sending email:", error);
-  }
-}
+//     // Send email
+//     await transporter.sendMail(mailOptions);
+//     console.log("Emails sent successfully.");
+//   } catch (error) {
+//     console.error("Error sending email:", error);
+//   }
+// }

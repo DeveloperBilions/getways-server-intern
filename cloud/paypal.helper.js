@@ -26,7 +26,7 @@ async function getAccessToken() {
 
 async function makePayout(receiverId, amount) {
   try {
-    const accessToken = await getAccessToken();
+    // const accessToken = await getAccessToken();
     const payoutData = {
       sender_batch_header: {
         sender_batch_id: `batch_${Date.now()}`,
@@ -42,14 +42,14 @@ async function makePayout(receiverId, amount) {
           },
           note: "Payment for service",
           sender_item_id: `item_${Date.now()}`,
-          receiver: receiverId,
+          receiver: "ZQ7GTTUACFRBC",
+          purpose: "GOODS"
         },
       ],
     };
-
     const response = await axios.post(`${PAYPAL_API_BASE_URL}/v1/payments/payouts`, payoutData, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer A21AAJhSFnOhSJtG1ILz11oQ2mEyY776tnW8UBQpkxc1ADdB4A-PMtK_VufO_pzTnDiQrbjHCrtdUlZ4PoTFcSOeaC4FL2LmA`,
         "Content-Type": "application/json",
       },
     });
@@ -61,7 +61,32 @@ async function makePayout(receiverId, amount) {
   }
 }
 
+async function getPayoutDetails(payoutBatchId) {
+  try {
+    const response = await axios.get(
+      `${process.env.PAYPAL_API_BASE_URL}/v1/payments/payouts/${payoutBatchId}`,
+      {
+        params: {
+          page: 1,
+          page_size: 5,
+          total_required: true,
+        },
+        headers: {
+          Authorization: `Bearer A21AAJhSFnOhSJtG1ILz11oQ2mEyY776tnW8UBQpkxc1ADdB4A-PMtK_VufO_pzTnDiQrbjHCrtdUlZ4PoTFcSOeaC4FL2LmA`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching payout details", error.message);
+    throw new Error("Failed to fetch payout details");
+  }
+}
+
+
 module.exports = {
     getAccessToken,
-    makePayout
+    makePayout,
+    getPayoutDetails,
 }
