@@ -1679,135 +1679,135 @@ Parse.Cloud.define("readExcelFile", async (request) => {
   }
 });
 
-Parse.Cloud.define("exportAndEmailPreviousDayTransactions", async (request) => {
-  try {
-    // Step 1: Define the start and end date for the previous day
-    const now = new Date();
-    const startDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() - 1
-    );
-    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  Parse.Cloud.define("exportAndEmailPreviousDayTransactions", async (request) => {
+    try {
+      // Step 1: Define the start and end date for the previous day
+      const now = new Date();
+      const startDate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - 1
+      );
+      const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Step 2: Query the TransactionRecords for transactions of type "recharge" within the previous day
-    const TransactionRecords = Parse.Object.extend("TransactionRecords");
-    const query = new Parse.Query(TransactionRecords);
-    query.equalTo("type", "recharge"); // Only transactions of type "recharge"
-    query.greaterThanOrEqualTo("transactionDate", startDate);
-    query.lessThan("transactionDate", endDate);
-    query.exists("transactionIdFromStripe"); // Only include records with transactionIdFromStripe defined
+      // Step 2: Query the TransactionRecords for transactions of type "recharge" within the previous day
+      const TransactionRecords = Parse.Object.extend("TransactionRecords");
+      const query = new Parse.Query(TransactionRecords);
+      query.equalTo("type", "recharge"); // Only transactions of type "recharge"
+      query.greaterThanOrEqualTo("transactionDate", startDate);
+      query.lessThan("transactionDate", endDate);
+      query.exists("transactionIdFromStripe"); // Only include records with transactionIdFromStripe defined
 
-    const transactions = await query.find({ useMasterKey: true });
+      const transactions = await query.find({ useMasterKey: true });
 
-    if (transactions.length === 0) {
+      if (transactions.length === 0) {
+        return {
+          status: "success",
+          message: "No transactions found for the previous day.",
+        };
+      }
+
+      // Step 3: Fetch Stripe checkout session data for each transaction
+      const stripeData = [];
+      for (const transaction of transactions) {
+        const transactionIdFromStripe = transaction.get(
+          "transactionIdFromStripe"
+        ); // Adjust field if needed
+        try {
+          const checkoutSession = await stripe.checkout.sessions.retrieve(
+            transactionIdFromStripe
+          );
+          stripeData.push({
+            stripeStatus: checkoutSession.status,
+            stripeAmount: checkoutSession.amount_total / 100, // Convert to standard currency format
+            stripeCurrency: checkoutSession.currency,
+            stripePaymentMethod: checkoutSession.payment_method_types.join(", "),
+            stripeCreated: new Date(checkoutSession.created * 1000), // Convert timestamp to date
+          });
+        } catch (error) {
+          console.error(
+            `Error fetching Stripe data for transaction ID: ${transactionIdFromStripe}`
+          );
+          stripeData.push({
+            stripeStatus: "Error fetching data",
+            stripeAmount: null,
+            stripeCurrency: null,
+            stripePaymentMethod: null,
+            stripeCreated: null,
+          });
+        }
+      }
+
+      // Step 4: Prepare data for Excel export
+      const exportData = transactions.map((transaction, index) => {
+        const transactionDate = transaction.get("transactionDate");
+        return {
+          TransactionID: transaction.id,
+          UserID: transaction.get("userId"),
+          Username: transaction.get("username"),
+          transactionIdFromStripe: transaction.get("transactionIdFromStripe"),
+          Amount: transaction.get("transactionAmount"),
+          Remark: transaction.get("remark"),
+          Status: transaction.get("status"),
+          TransactionDate: transactionDate
+            ? transactionDate.toISOString()
+            : "N/A", // ISO format includes date and time
+          StripeStatus: stripeData[index].stripeStatus,
+        };
+      });
+
+      // Step 5: Create an Excel workbook and sheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Append the worksheet to the workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
+
+      // Step 6: Write the workbook to a file
+      const filePath = `./Previous_Day_Transactions_${
+        startDate.toISOString().split("T")[0]
+      }.xlsx`;
+      XLSX.writeFile(workbook, filePath);
+
+      // Step 7: Send the Excel file via email
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL, // Replace with your Gmail address
+          pass: process.env.PASSWORD, // Replace with your Gmail app password
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL, // Replace with your Gmail address
+        to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"], // Replace with recipient emails
+        subject: "Previous Day's Transactions Report",
+        text: "Please find attached the report for the previous day's transactions.",
+        attachments: [
+          {
+            filename: `Previous_Day_Transactions_${
+              startDate.toISOString().split("T")[0]
+            }.xlsx`,
+            path: filePath,
+          },
+        ],
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      // Step 8: Return success response
       return {
         status: "success",
-        message: "No transactions found for the previous day.",
+        message: "Previous day's transactions exported and emailed successfully.",
       };
+    } catch (error) {
+      console.error("Error exporting and emailing transactions:", error.message);
+      throw new Parse.Error(
+        500,
+        `Error exporting and emailing transactions: ${error.message}`
+      );
     }
-
-    // Step 3: Fetch Stripe checkout session data for each transaction
-    const stripeData = [];
-    for (const transaction of transactions) {
-      const transactionIdFromStripe = transaction.get(
-        "transactionIdFromStripe"
-      ); // Adjust field if needed
-      try {
-        const checkoutSession = await stripe.checkout.sessions.retrieve(
-          transactionIdFromStripe
-        );
-        stripeData.push({
-          stripeStatus: checkoutSession.status,
-          stripeAmount: checkoutSession.amount_total / 100, // Convert to standard currency format
-          stripeCurrency: checkoutSession.currency,
-          stripePaymentMethod: checkoutSession.payment_method_types.join(", "),
-          stripeCreated: new Date(checkoutSession.created * 1000), // Convert timestamp to date
-        });
-      } catch (error) {
-        console.error(
-          `Error fetching Stripe data for transaction ID: ${transactionIdFromStripe}`
-        );
-        stripeData.push({
-          stripeStatus: "Error fetching data",
-          stripeAmount: null,
-          stripeCurrency: null,
-          stripePaymentMethod: null,
-          stripeCreated: null,
-        });
-      }
-    }
-
-    // Step 4: Prepare data for Excel export
-    const exportData = transactions.map((transaction, index) => {
-      const transactionDate = transaction.get("transactionDate");
-      return {
-        TransactionID: transaction.id,
-        UserID: transaction.get("userId"),
-        Username: transaction.get("username"),
-        transactionIdFromStripe: transaction.get("transactionIdFromStripe"),
-        Amount: transaction.get("transactionAmount"),
-        Remark: transaction.get("remark"),
-        Status: transaction.get("status"),
-        TransactionDate: transactionDate
-          ? transactionDate.toISOString()
-          : "N/A", // ISO format includes date and time
-        StripeStatus: stripeData[index].stripeStatus,
-      };
-    });
-
-    // Step 5: Create an Excel workbook and sheet
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-    // Append the worksheet to the workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
-
-    // Step 6: Write the workbook to a file
-    const filePath = `./Previous_Day_Transactions_${
-      startDate.toISOString().split("T")[0]
-    }.xlsx`;
-    XLSX.writeFile(workbook, filePath);
-
-    // Step 7: Send the Excel file via email
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL, // Replace with your Gmail address
-        pass: process.env.PASSWORD, // Replace with your Gmail app password
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL, // Replace with your Gmail address
-      to: ["viraj@bilions.co", "malhar@bilions.co", "niket@bilions.co"], // Replace with recipient emails
-      subject: "Previous Day's Transactions Report",
-      text: "Please find attached the report for the previous day's transactions.",
-      attachments: [
-        {
-          filename: `Previous_Day_Transactions_${
-            startDate.toISOString().split("T")[0]
-          }.xlsx`,
-          path: filePath,
-        },
-      ],
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    // Step 8: Return success response
-    return {
-      status: "success",
-      message: "Previous day's transactions exported and emailed successfully.",
-    };
-  } catch (error) {
-    console.error("Error exporting and emailing transactions:", error.message);
-    throw new Parse.Error(
-      500,
-      `Error exporting and emailing transactions: ${error.message}`
-    );
-  }
-});
+  });
 
 Parse.Cloud.define("cleanupReferralLink", async (request) => {
   try {
@@ -1875,6 +1875,83 @@ Parse.Cloud.define("fetchPayoutDetails", async (request) => {
     };
   }
 });
+
+Parse.Cloud.define("fetchTransactionsWithCounts", async (request) => {
+  try {
+    const {
+      amountFilter, 
+      sortOrder = "desc", 
+      startDate, 
+      endDate, 
+      status = [2,3],
+    } = request.params;
+
+    const query = new Parse.Query("TransactionRecords");
+
+    // Apply status filter if provided; otherwise, fetch all statuses
+    if (status.length > 0) {
+      query.containedIn("status", status);
+    }
+
+    // Apply amount filter if provided
+    if (amountFilter !== undefined) {
+      query.equalTo("transactionAmount", amountFilter);
+    }
+
+    // Apply date filters if provided
+    if (startDate) {
+      query.greaterThanOrEqualTo("createdAt", new Date(startDate));
+    }
+    if (endDate) {
+      query.lessThanOrEqualTo("createdAt", new Date(endDate));
+    }
+
+    // Select only transactionAmount field
+    query.select("transactionAmount");
+
+    // Execute the query
+    const results = await query.find({ useMasterKey: true });
+
+    if (results.length === 0) {
+      return {
+        success: true,
+        data: [],
+        message: "No transactions found matching the criteria.",
+      };
+    }
+
+    // Create a map to store counts for each unique transactionAmount
+    const transactionMap = {};
+
+    results.forEach((record) => {
+      const amount = record.get("transactionAmount") || 0;
+      transactionMap[amount] = (transactionMap[amount] || 0) + 1;
+    });
+
+    // Convert map to sorted array of { amount, count } objects
+    let transactionCounts = Object.entries(transactionMap).map(([amount, count]) => ({
+      amount: parseFloat(amount),
+      count,
+    }));
+
+    // Sort based on the provided sort order
+    transactionCounts.sort((a, b) => (sortOrder === "asc" ? a.amount - b.amount : b.amount - a.amount));
+
+    return {
+      success: true,
+      data: transactionCounts,
+    };
+  } catch (error) {
+    console.error("Error fetching transaction counts:", error.message);
+    return {
+      status: "error",
+      code: 500,
+      message: error.message,
+    };
+  }
+});
+
+
 
 Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");
