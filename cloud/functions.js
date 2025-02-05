@@ -223,7 +223,9 @@ Parse.Cloud.define("getUserById", async (request) => {
 
 Parse.Cloud.define("fetchAllUsers", async (request) => {
   try {
+    const { page = 1, limit = 10, search } = request.params;
     const userQuery = new Parse.Query(Parse.User);
+
     userQuery.select(
       "username",
       "name",
@@ -235,9 +237,22 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
       "redeemService"
     );
     userQuery.equalTo("userReferralCode", null);
+
+     if (search && search.trim() !== "") {
+       userQuery.matches("username", new RegExp(search, "i"));
+     }
+
+    const totalCount = await userQuery.count({ useMasterKey: true });
+
+    userQuery.descending("createdAt");
+    userQuery.skip((page - 1) * limit);
+    userQuery.limit(limit);
+
     const allUsers = await userQuery.find({ useMasterKey: true });
-    return allUsers.map((user) => {
-      return {
+
+    return {
+      total: totalCount,
+      users: allUsers.map((user) => ({
         id: user.id,
         username: user.get("username"),
         name: user.get("name"),
@@ -247,27 +262,17 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
         createdAt: user.get("createdAt"),
         roleName: user.get("roleName"),
         redeemService: user.get("redeemService"),
-      };
-    });
+      })),
+    };
   } catch (error) {
-    // Handle different error types
-    if (error instanceof Parse.Error) {
-      // Return the error if it's a Parse-specific error
-      return {
-        status: "error",
-        code: error.code,
-        message: error.message,
-      };
-    } else {
-      // Handle any unexpected errors
-      return {
-        status: "error",
-        code: 500,
-        message: "An unexpected error occurred.",
-      };
-    }
+    return {
+      status: "error",
+      code: error.code || 500,
+      message: error.message || "An unexpected error occurred.",
+    };
   }
 });
+
 
 Parse.Cloud.define("userTransaction", async (request) => {
   const axios = require("axios");
