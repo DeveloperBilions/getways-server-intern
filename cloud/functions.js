@@ -27,6 +27,21 @@ Parse.Cloud.define("createUser", async (request) => {
     );
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Parse.Error(400, "Invalid email address");
+  }
+
+  const phoneRegex = /^[0-9]{10}$/;
+  if (!phoneRegex.test(phoneNumber)) {
+    throw new Parse.Error(400, "Invalid phone number");
+  }
+
+  const passwordRegex = /^.{6,}$/;
+  if (!passwordRegex.test(password)) {
+    throw new Parse.Error(400, "Password must be at least 6 characters");
+  }
+
   try {
     // Create a new Parse User
     const user = new Parse.User();
@@ -528,6 +543,13 @@ Parse.Cloud.define("redeemRedords", async (request) => {
       return {
         status: "error",
         message: "User Information are not correct",
+      };
+    }
+
+    if(transactionAmount===null || transactionAmount===undefined || transactionAmount<=0 || isNaN(transactionAmount) || transactionAmount===""){
+      return {
+        status: "error",
+        message: "Transaction amount is not correct",
       };
     }
     // Step 1: Fetch the user's wallet
