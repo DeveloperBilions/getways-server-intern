@@ -228,6 +228,7 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
 
     userQuery.select(
       "username",
+      "userParentName",
       "name",
       "email",
       "lastLoginIp",
@@ -255,6 +256,7 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
       users: allUsers.map((user) => ({
         id: user.id,
         username: user.get("username"),
+        userParentName: user.get("userParentName"),
         name: user.get("name"),
         email: user.get("email"),
         lastLoginIp: user.get("lastLoginIp"),
@@ -1860,6 +1862,40 @@ Parse.Cloud.define("sendPayout", async (request) => {
       message: error.message,
     };
   }
+});
+
+Parse.Cloud.define("fetchTransactionRecords", async (request) => {
+  const { page, limit, search, type, status } = request.params;
+  console.log(request.params);
+  const skip = (page - 1) * limit;
+
+  const query = new Parse.Query("TransactionRecords");
+
+  if (search) {
+    query.matches("username", new RegExp(search, "i"));
+  }
+
+  if (type) {
+    query.equalTo("type", type);
+  }
+
+  if (status !== "") {
+    console.log("Status:", status);
+    query.equalTo("status", status);
+  }
+
+  const total = await query.count();
+  console.log(total,"bhavin")
+  query.skip(skip);
+  query.limit(limit);
+  query.descending("transactionDate");
+
+  const records = await query.find();
+
+  return {
+    records: records.map((record) => record.toJSON()),
+    total,
+  };
 });
 
 Parse.Cloud.beforeSave("Test", () => {
