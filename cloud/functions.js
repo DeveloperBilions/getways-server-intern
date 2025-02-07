@@ -238,6 +238,7 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
       "redeemService"
     );
     userQuery.equalTo("userReferralCode", null);
+    userQuery.equalTo("isDeleted", null);
 
      if (search && search.trim() !== "") {
        userQuery.matches("username", new RegExp(search, "i"));
@@ -248,7 +249,7 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
     userQuery.descending("createdAt");
     userQuery.skip((page - 1) * limit);
     userQuery.limit(limit);
-
+    
     const allUsers = await userQuery.find({ useMasterKey: true });
 
     return {
@@ -1885,7 +1886,6 @@ Parse.Cloud.define("fetchTransactionRecords", async (request) => {
   }
 
   const total = await query.count();
-  console.log(total,"bhavin")
   query.skip(skip);
   query.limit(limit);
   query.descending("transactionDate");
