@@ -938,6 +938,10 @@ Parse.Cloud.define("checkpresence", async (request) => {
       throw new Error("User does not exist!");
     }
 
+    if (user.get("isDeleted", true)) {
+      throw new Error("This user account has been deleted.");
+    }
+
     // Return the user details (you can adjust this as needed)
     return {
       fromAgentExcel: user.get("fromAgentExcel"),
