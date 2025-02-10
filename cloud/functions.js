@@ -223,7 +223,7 @@ Parse.Cloud.define("getUserById", async (request) => {
 
 Parse.Cloud.define("fetchAllUsers", async (request) => {
   try {
-    const { page = 1, limit = 10, search } = request.params;
+    const { page = 1, limit = 10, search, status, role } = request.params;
     const userQuery = new Parse.Query(Parse.User);
 
     userQuery.select(
@@ -240,21 +240,59 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
     userQuery.equalTo("userReferralCode", null);
     userQuery.equalTo("isDeleted", null);
 
-     if (search && search.trim() !== "") {
-       userQuery.matches("username", new RegExp(search, "i"));
-     }
+    if (search && search.trim() !== "") {
+      userQuery.matches("username", new RegExp(search, "i"));
+    }
 
-    const totalCount = await userQuery.count({ useMasterKey: true });
+    if (role && (role === "Player" || role === "Agent")) {
+      userQuery.equalTo("roleName", role);
+    }
 
     userQuery.descending("createdAt");
-    userQuery.skip((page - 1) * limit);
-    userQuery.limit(limit);
-    
+    userQuery.limit(10000);
+
     const allUsers = await userQuery.find({ useMasterKey: true });
 
+    let filteredUsers = allUsers;
+
+    if (status !== "") {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const transactionChecks = allUsers.map(async (user) => {
+        const Transaction = Parse.Object.extend("TransactionRecords");
+        const transactionQuery = new Parse.Query(Transaction);
+        transactionQuery.equalTo("userId", user.id);
+        transactionQuery.greaterThan("transactionDate", sevenDaysAgo);
+        const hasRecentTransactions =
+          (await transactionQuery.count({ useMasterKey: true })) > 0;
+
+        return {
+          hasTransactions: hasRecentTransactions,
+          user: user,
+        };
+      });
+
+      const usersWithTransactionStatus = await Promise.all(transactionChecks);
+
+      filteredUsers = usersWithTransactionStatus
+        .filter(({ hasTransactions }) =>
+          status === "active" ? hasTransactions : !hasTransactions
+        )
+        .map(({ user }) => user);
+    }
+
+    const totalFilteredCount = filteredUsers.length;
+
+    // Apply pagination after filtering
+    const paginatedUsers = filteredUsers.slice(
+      (page - 1) * limit,
+      page * limit
+    );
+
     return {
-      total: totalCount,
-      users: allUsers.map((user) => ({
+      total: totalFilteredCount,
+      users: paginatedUsers.map((user) => ({
         id: user.id,
         username: user.get("username"),
         userParentName: user.get("userParentName"),
@@ -275,6 +313,7 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
     };
   }
 });
+
 
 
 Parse.Cloud.define("userTransaction", async (request) => {
@@ -1866,8 +1905,7 @@ Parse.Cloud.define("sendPayout", async (request) => {
 });
 
 Parse.Cloud.define("fetchTransactionRecords", async (request) => {
-  const { page, limit, search, type, status } = request.params;
-  console.log(request.params);
+  const { page, limit, search, type, status, dateRange } = request.params;
   const skip = (page - 1) * limit;
 
   const query = new Parse.Query("TransactionRecords");
@@ -1883,6 +1921,27 @@ Parse.Cloud.define("fetchTransactionRecords", async (request) => {
   if (status !== "") {
     console.log("Status:", status);
     query.equalTo("status", status);
+  }
+
+  if (dateRange) {
+    const now = new Date();
+    let startDate;
+
+    switch (dateRange) {
+      case "7d":
+        startDate = new Date(now.setDate(now.getDate() - 7));
+        break;
+      case "1m":
+        startDate = new Date(now.setMonth(now.getMonth() - 1));
+        break;
+      case "1y":
+        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+        break;
+      default:
+        startDate = now;
+        break;
+    }
+    query.greaterThanOrEqualTo("transactionDate", startDate);
   }
 
   const total = await query.count();
