@@ -7,6 +7,8 @@ const { makePayout } = require("./helper");
 const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
 const { validatePositiveNumber } = require("./validators/number.validator");
 const { validateDates } = require("./validators/date.validator");
+const axios = require("axios");
+const { error } = require("console");
 
 Parse.Cloud.define("createUser", async (request) => {
   const {
@@ -1905,14 +1907,22 @@ Parse.Cloud.define("sendPayout", async (request) => {
 
   try {
     const payoutResult = await makePayout(receiverId, amount);
-    return { success: true, data: payoutResult };
+    console.log("Payout result:", payoutResult);
+    if (payoutResult.success) {
+      return {
+        success: true,
+        message: `Payout of $${amount} sent successfully to user with ID: ${receiverId}`,
+        data: payoutResult.data,
+      };
+    }else{
+      throw new Parse.Error(500, payoutResult.message);
+    }
   } catch (error) {
-    return {
-      status: "error",
-      message: error.message,
-    };
+    console.error("Error sending payout:", error);
+    throw new Parse.Error(500, error.message);
   }
 });
+
 
 Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");

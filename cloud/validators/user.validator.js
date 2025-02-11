@@ -1,6 +1,6 @@
 const usernameRegex = /^[a-zA-Z0-9_]{3,16}$/;
 const nameRegex = /^[a-zA-Z\s]{1,50}$/;
-const phoneNumberRegex = /^\+?[1-9]\d{1,14}$/;
+const phoneNumberRegex = /^\+[1-9]\d{1,14}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordRegex = /^.{6,}$/;
 function validateCreateUser(user) {
