@@ -7,8 +7,6 @@ const { makePayout } = require("./helper");
 const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
 const { validatePositiveNumber } = require("./validators/number.validator");
 const { validateDates } = require("./validators/date.validator");
-const axios = require("axios");
-const { error } = require("console");
 
 Parse.Cloud.define("createUser", async (request) => {
   const {
