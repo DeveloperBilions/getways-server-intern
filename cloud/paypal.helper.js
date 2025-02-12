@@ -43,11 +43,12 @@ async function makePayout(receiverId, amount) {
           },
           note: "Payment for service",
           sender_item_id: `item_${Date.now()}`,
-          receiver: "ZQ7GTTUACFRBC",
-          purpose: "GOODS"
+          receiver: receiverId,
+          // receiver: "ZQ7GTTUACFRBC",
         },
       ],
     };
+
     const response = await axios.post(`${PAYPAL_API_BASE_URL}/v1/payments/payouts`, payoutData, {
       headers: {
         Authorization: `Bearer ${PAYPAL_API_ACCESS_TOKEN}`,
@@ -55,10 +56,12 @@ async function makePayout(receiverId, amount) {
       },
     });
 
-    return response.data;
+    return { success: true, data: response.data};
   } catch (error) {
-    console.error("Error making payout", error.message);
-    throw new Error("Payout failed");
+    console.log("Error making payout", error.response.data.details);
+    return { error: error.response.data.name, message: error.response.data.details, success: false};
+    // throw new Error("Failed to make payout");
+    // return error.response.data;
   }
 }
 

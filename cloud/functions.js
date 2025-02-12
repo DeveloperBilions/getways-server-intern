@@ -1862,21 +1862,35 @@ Parse.Cloud.define("cleanupReferralLink", async (request) => {
 });
 
 Parse.Cloud.define("sendPayout", async (request) => {
-  const { receiverId, amount } = request.params;
+  const { receiverId, amount, paymentMode } = request.params;
 
-  if (!receiverId || !amount) {
+  if (!receiverId || !amount || !paymentMode) {
     throw new Parse.Error(400, "Missing required fields: receiverId, amount");
   }
 
   try {
-    const payoutResult = await makePayout(receiverId, amount);
-    return { success: true, data: payoutResult };
+    if (paymentMode === "paypalId") {
+      const payoutResult = await makePayout(receiverId, amount);
+      console.log("Payout result:", payoutResult);
+      if (payoutResult.success) {
+        return {
+          success: true,
+          message: `Payout of $${amount} sent successfully to user with ID: ${receiverId}`,
+          data: payoutResult.data,
+        };
+      } else {
+        console.log("Error sending payout:", payoutResult);
+        throw new Parse.Error(500, payoutResult.message);
+      }
+    } else {
+      return{
+        success :true,
+        message: "Payout sent successfully"
+      }
+    }
   } catch (error) {
-    console.log(error, "error");
-    return {
-      status: "error",
-      message: error.message,
-    };
+    console.error("Error sending payout:", error);
+    throw new Parse.Error(500, error.message);
   }
 });
 
