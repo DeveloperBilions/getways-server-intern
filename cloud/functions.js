@@ -31,7 +31,7 @@ Parse.Cloud.define("createUser", async (request) => {
     password,
   };
   const validatorResponse = validateCreateUser(validatorData);
-  if (validatorResponse.isValid) {
+  if (!validatorResponse.isValid) {
     throw new Parse.Error(400, validatorResponse.errors);
   }
 
@@ -109,7 +109,7 @@ Parse.Cloud.define("updateUser", async (request) => {
   };
 
   const validatorResponse = validateUpdateUser(validatorData);
-  if (validatorResponse.isValid) {
+  if (!validatorResponse.isValid) {
     throw new Parse.Error(400, validatorResponse.errors);
   }
 
