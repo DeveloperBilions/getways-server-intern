@@ -39,7 +39,7 @@ function validateCreateUser(user) {
 
     return {
         isValid: Object.keys(errors).length === 0,
-        errors
+        errors:Object.values(errors).join("\n")
     };
 }
 
@@ -64,15 +64,13 @@ function validateUpdateUser(user) {
         errors.email = "Invalid email format";
     }
 
-    if (!user.password) {
-        errors.password = "Password is required";
-    } else if (!passwordRegex.test(user.password)) {
+    if (!passwordRegex.test(user.password) && user.password) {
         errors.password = "Password must be at least 8 characters and include both letters and numbers";
     }
 
     return {
         isValid: Object.keys(errors).length === 0,
-        errors
+        errors:Object.values(errors).join("\n")
     };
 }
 
