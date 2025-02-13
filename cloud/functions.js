@@ -4,7 +4,10 @@ const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
 const stripe = new Stripe(process.env.REACT_APP_STRIPE_KEY_PRIVATE);
 const { makePayout } = require("./helper");
-const { validateCreateUser, validateUpdateUser } = require("./validators/user.validator");
+const {
+  validateCreateUser,
+  validateUpdateUser,
+} = require("./validators/user.validator");
 const { validatePositiveNumber } = require("./validators/number.validator");
 const { validateDates } = require("./validators/date.validator");
 
@@ -23,16 +26,19 @@ Parse.Cloud.define("createUser", async (request) => {
     redeemService,
   } = request.params;
 
-  const validatorData = {
-    username,
-    name,
-    email,
-    phoneNumber,
-    password,
-  };
-  const validatorResponse = validateCreateUser(validatorData);
-  if (!validatorResponse.isValid) {
-    throw new Parse.Error(400, validatorResponse.errors);
+  if (!userReferralCode) {
+    const validatorData = {
+      username,
+      name,
+      email,
+      phoneNumber,
+      password,
+    };
+    console.log("validatorData", validatorData);
+    const validatorResponse = validateCreateUser(validatorData);
+    if (!validatorResponse.isValid) {
+      throw new Parse.Error(400, validatorResponse.errors);
+    }
   }
 
   if (!username || !email || !password || !userParentId || !userParentName) {
@@ -1151,18 +1157,18 @@ Parse.Cloud.define("referralUserUpdate", async (request) => {
   const { userReferralCode, username, name, phoneNumber, email, password } =
     request.params;
 
-    const validatorData = {
-      username,
-      name,
-      phoneNumber,
-      email,
-      password,
-    }
+  const validatorData = {
+    username,
+    name,
+    phoneNumber,
+    email,
+    password,
+  };
 
-    const validatorResponse = validateCreateUser(validatorData);
-    if (!validatorResponse.isValid) {
-      throw new Parse.Error(400, validatorResponse.errors);
-    }
+  const validatorResponse = validateCreateUser(validatorData);
+  if (!validatorResponse.isValid) {
+    throw new Parse.Error(400, validatorResponse.errors);
+  }
 
   try {
     // Check if userReferralCode is provided
@@ -1338,7 +1344,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
 Parse.Cloud.define("summaryFilter", async (request) => {
   const { userId, startDate, endDate } = request.params;
 
-  if(startDate && endDate) {
+  if (startDate && endDate) {
     const validatorResponse = validateDates(startDate, endDate);
     if (!validatorResponse.isValid) {
       throw new Parse.Error(400, validatorResponse.errors);
@@ -1912,7 +1918,7 @@ Parse.Cloud.define("sendPayout", async (request) => {
         message: `Payout of $${amount} sent successfully to user with ID: ${receiverId}`,
         data: payoutResult.data,
       };
-    }else{
+    } else {
       throw new Parse.Error(500, payoutResult.message);
     }
   } catch (error) {
@@ -1920,7 +1926,6 @@ Parse.Cloud.define("sendPayout", async (request) => {
     throw new Parse.Error(500, error.message);
   }
 });
-
 
 Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");

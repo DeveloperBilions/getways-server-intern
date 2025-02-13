@@ -1,4 +1,4 @@
-const usernameRegex = /^[A-Za-z0-9@.!_]+$/;
+const usernameRegex = /^[A-Za-z0-9@.!_]{1,25}$/;
 const nameRegex = /^[a-zA-Z\s]{1,50}$/;
 const phoneNumberRegex = /^\+[1-9]\d{1,14}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
