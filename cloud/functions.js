@@ -20,13 +20,21 @@ Parse.Cloud.define("createUser", async (request) => {
     redeemService,
   } = request.params;
 
-  if (!username || !email || !password || !userParentId || !userParentName) {
-    throw new Parse.Error(
-      400,
-      "Missing required fields: username, email, password, userParentId, userParentName"
-    );
-  }
+  const requiredFields = {
+    username: "Username",
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    phoneNumber: "Phone Number",
+    userParentName: "User Parent Name",
+    roleName: "Role Name",
+  };
 
+  for (const [key, field] of Object.entries(requiredFields)) {
+    if (!request.params[key]) {
+      throw new Parse.Error(400, `${field} is required`);
+    }
+  }
   try {
     // Create a new Parse User
     const user = new Parse.User();
@@ -997,6 +1005,10 @@ Parse.Cloud.define("checkpresence", async (request) => {
 
     if (!user) {
       throw new Error("User does not exist!");
+    }
+
+    if (user.get("isDeleted", true)) {
+      throw new Error("This user account has been deleted.");
     }
 
     // Return the user details (you can adjust this as needed)
