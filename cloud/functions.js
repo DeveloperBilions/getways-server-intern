@@ -241,10 +241,24 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
     userQuery.equalTo("isDeleted", null);
 
     if (search && search.trim() !== "") {
-      userQuery.matches("username", new RegExp(search, "i"));
+      const searchRegex = new RegExp(search, "i");
+      
+      const emailQuery = new Parse.Query(Parse.User);
+      emailQuery.matches("email", searchRegex);
+      
+      const usernameQuery = new Parse.Query(Parse.User);
+      usernameQuery.matches("username", searchRegex);
+
+      const userParentNameQuery = new Parse.Query(Parse.User);
+      userParentNameQuery.matches("userParentName", searchRegex);
+
+      const dateQuery = new Parse.Query(Parse.User);
+      dateQuery.matches("createdAt.iso", searchRegex);
+      
+      userQuery._orQuery([usernameQuery,emailQuery, userParentNameQuery, dateQuery]);
     }
 
-    if (role && (role === "Player" || role === "Agent")) {
+    if (role && (role === "Player" || role === "Agent" || role === 'Super-User')) {
       userQuery.equalTo("roleName", role);
     }
 
