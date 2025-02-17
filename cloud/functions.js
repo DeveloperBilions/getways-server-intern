@@ -84,7 +84,7 @@ Parse.Cloud.define("createUser", async (request) => {
 });
 
 Parse.Cloud.define("updateUser", async (request) => {
-  const { userId, username, name, email, balance , password } = request.params;
+  const { userId, username, name, email, balance, password } = request.params;
 
   try {
     // Find the user by ID
@@ -100,7 +100,7 @@ Parse.Cloud.define("updateUser", async (request) => {
     user.set("username", username);
     user.set("name", name);
     user.set("email", email);
-    if(password){
+    if (password) {
       user.set("password", password);
     }
     // user.set("balance", parseFloat(balance));
@@ -242,10 +242,10 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
 
     if (search && search.trim() !== "") {
       const searchRegex = new RegExp(search, "i");
-      
+
       const emailQuery = new Parse.Query(Parse.User);
       emailQuery.matches("email", searchRegex);
-      
+
       const usernameQuery = new Parse.Query(Parse.User);
       usernameQuery.matches("username", searchRegex);
 
@@ -254,11 +254,19 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
 
       const dateQuery = new Parse.Query(Parse.User);
       dateQuery.matches("createdAt.iso", searchRegex);
-      
-      userQuery._orQuery([usernameQuery,emailQuery, userParentNameQuery, dateQuery]);
+
+      userQuery._orQuery([
+        usernameQuery,
+        emailQuery,
+        userParentNameQuery,
+        dateQuery,
+      ]);
     }
 
-    if (role && (role === "Player" || role === "Agent" || role === 'Super-User')) {
+    if (
+      role &&
+      (role === "Player" || role === "Agent" || role === "Super-User")
+    ) {
       userQuery.equalTo("roleName", role);
     }
 
@@ -327,8 +335,6 @@ Parse.Cloud.define("fetchAllUsers", async (request) => {
     };
   }
 });
-
-
 
 Parse.Cloud.define("userTransaction", async (request) => {
   const axios = require("axios");
@@ -584,8 +590,7 @@ Parse.Cloud.define("redeemRedords", async (request) => {
   } = request.params;
 
   try {
-  
-    if(!username || !id){
+    if (!username || !id) {
       return {
         status: "error",
         message: "User Information are not correct",
@@ -679,14 +684,14 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
   } = request.params;
 
   try {
-    if(!username || !id){
+    if (!username || !id) {
       return {
         status: "error",
         message: "User Information are not correct",
       };
     }
-     // Check if the user has exceeded the redeem request limit for the day
-     if (!isCashOut) {
+    // Check if the user has exceeded the redeem request limit for the day
+    if (!isCashOut) {
       const TransactionDetails = Parse.Object.extend("TransactionRecords");
       const query = new Parse.Query(TransactionDetails);
 
@@ -708,7 +713,8 @@ Parse.Cloud.define("playerRedeemRedords", async (request) => {
       if (redeemCount >= 10) {
         return {
           status: "error",
-          message: "You have exceeded the maximum of 10 redeem requests for today.",
+          message:
+            "You have exceeded the maximum of 10 redeem requests for today.",
         };
       }
     }
@@ -1311,7 +1317,7 @@ Parse.Cloud.define("redeemParentServiceFee", async (request) => {
     const query = new Parse.Query(Parse.User);
     query.select("redeemService");
     query.select("redeemServiceEnabled");
-    query.select("rechargeLimit")
+    query.select("rechargeLimit");
     query.equalTo("objectId", userId);
 
     const user = await query.first({ useMasterKey: true });
@@ -1875,26 +1881,26 @@ Parse.Cloud.define("cleanupReferralLink", async (request) => {
     const query = new Parse.Query(Parse.User);
     // Add a constraint to fetch users with a referral value
     query.exists("userReferralCode");
-    
+
     // Calculate the timestamp for 24 hours ago
     const now = new Date();
     const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     query.greaterThanOrEqualTo("createdAt", last24Hours);
-    
+
     query.descending("createdAt");
-    
+
     const user = await query.find({ useMasterKey: true });
-    
+
     if (!user) {
       throw new Error("User not found.");
     }
-    
+
     // Iterate through users and delete each one
     for (const users of user) {
       console.log("Deleting User:", users.get("username"));
       await users.destroy({ useMasterKey: true });
     }
-    
+
     console.log("Users deleted successfully.");
     return { message: `${user.length} users deleted.` };
   } catch (error) {}
@@ -1921,11 +1927,31 @@ Parse.Cloud.define("sendPayout", async (request) => {
 Parse.Cloud.define("fetchTransactionRecords", async (request) => {
   const { page, limit, search, type, status, dateRange } = request.params;
   const skip = (page - 1) * limit;
+  console.log("Fetching transaction records...------------------------");
 
   const query = new Parse.Query("TransactionRecords");
 
-  if (search) {
-    query.matches("username", new RegExp(search, "i"));
+  if (search && search.trim() !== "") {
+    const searchRegex = new RegExp(search, "i");
+
+    const usernameQuery = new Parse.Query("TransactionRecords");
+    usernameQuery.matches("username", searchRegex);
+
+    const transactionAmountQuery = new Parse.Query("TransactionRecords");
+    transactionAmountQuery.matches("transactionAmount", searchRegex);
+
+    const remarkQuery = new Parse.Query("TransactionRecords");
+    remarkQuery.matches("remark", searchRegex);
+
+    const dateQuery = new Parse.Query("TransactionRecords");
+    dateQuery.matches("createdAt.iso", searchRegex);
+
+    query._orQuery([
+      usernameQuery,
+      transactionAmountQuery,
+      remarkQuery,
+      dateQuery,
+    ]);
   }
 
   if (type) {
