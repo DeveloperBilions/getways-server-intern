@@ -1857,6 +1857,113 @@ Parse.Cloud.define("sendPayout", async (request) => {
   }
 });
 
+Parse.Cloud.define(
+  "fetchAllAgentsWithTransactions",
+  async (request) => {
+    try {
+      const { page, limit, sortOrder, search } = request.params;
+      const skip = (page - 1) * limit;
+
+      // Query for agent users
+      const agentQuery = new Parse.Query(Parse.User);
+      agentQuery.equalTo("roleName", "Agent");
+
+      if (search && search.trim() !== "") {
+        agentQuery.matches("username", new RegExp(search, "i"));
+      }
+
+      agentQuery.select(
+        "_id",
+        "username",
+        "name",
+        "email",
+        "createdAt",
+        "roleName"
+      );
+
+      const total = await agentQuery.count({ useMasterKey: true });
+      const agentUsers = await agentQuery.find({ useMasterKey: true });
+
+      const agentUsernames = agentUsers.map((agent) => agent.get("username"));
+
+      const rechargeQuery = new Parse.Query("TransactionRecords");
+      rechargeQuery.containedIn("username", agentUsernames);
+      rechargeQuery.equalTo("type", "recharge");
+
+      const rechargeRecords = await rechargeQuery.find({ useMasterKey: true });
+
+      const rechargeMap = rechargeRecords.reduce((map, record) => {
+        const username = record.get("username");
+        const amount = record.get("transactionAmount") || 0;
+        map[username] = (map[username] || 0) + amount;
+        return map;
+      }, {});
+
+      const redeemQuery = new Parse.Query("TransactionRecords");
+      redeemQuery.containedIn("username", agentUsernames);
+      redeemQuery.equalTo("type", "redeem");
+
+      const redeemRecords = await redeemQuery.find({ useMasterKey: true });
+
+      const redeemMap = redeemRecords.reduce((map, record) => {
+        const username = record.get("username");
+        const amount = record.get("transactionAmount") || 0;
+        map[username] = (map[username] || 0) + amount;
+        return map;
+      }, {});
+
+      // Build result array with both total recharge and total redeem amounts
+      const results = agentUsers.map((agent) => {
+        const username = agent.get("username");
+        return {
+          id: agent.id,
+          username: username,
+          name: agent.get("name"),
+          email: agent.get("email"),
+          createdAt: agent.get("createdAt"),
+          roleName: agent.get("roleName"),
+          totalRechargeAmount: rechargeMap[username] || 0,
+          totalRedeemAmount: redeemMap[username] || 0,
+        };
+      });
+
+      // Sort the results before pagination
+      results.sort((a, b) => {
+        if (sortOrder === "ASC") {
+          return a.totalRechargeAmount - b.totalRechargeAmount;
+        } else if (sortOrder === "DESC") {
+          return b.totalRechargeAmount - a.totalRechargeAmount;
+        } else {
+          return 0;
+        }
+      });
+
+      // Apply pagination after sorting
+      const paginatedResults = results.slice(skip, skip + limit);
+
+      return {
+        results: paginatedResults,
+        total,
+      };
+    } catch (error) {
+      if (error instanceof Parse.Error) {
+        return {
+          status: "error",
+          code: error.code,
+          message: error.message,
+        };
+      } else {
+        return {
+          status: "error",
+          code: 500,
+          message: "An unexpected error occurred.",
+        };
+      }
+    }
+  }
+);
+
+
 Parse.Cloud.beforeSave("Test", () => {
   throw new Parse.Error(9001, "Saving test objects is not available.");
 });
